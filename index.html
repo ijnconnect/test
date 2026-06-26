@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<title>Today's Outpatients</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@500;700;900&display=swap" rel="stylesheet">
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+  font-family: "Figtree", Arial, sans-serif;
+}
+
+.stage {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+  overflow: hidden;
+  background: #0b5f91;
+}
+
+.bg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  z-index: 0;
+}
+
+.content {
+  position: absolute;
+  top: 31%;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  z-index: 2;
+  color: #ffffff;
+}
+
+.title {
+  font-size: clamp(60px, 6.7vw, 74px);
+  font-weight: 900;
+  margin-bottom: 22px;
+}
+
+.date {
+  font-size: clamp(42px, 4.8vw, 54px);
+  font-weight: 500;
+  margin-bottom: 85px;
+}
+
+.number {
+  font-size: clamp(220px, 25vw, 280px);
+  font-weight: 900;
+  line-height: 0.9;
+  margin-bottom: 70px;
+}
+
+.closed-message {
+  font-size: clamp(86px, 9vw, 118px);
+  font-weight: 900;
+  line-height: 1.15;
+  letter-spacing: -2px;
+  color: #bfe4ff;
+  margin-bottom: 70px;
+}
+
+.divider {
+  width: 70%;
+  max-width: 720px;
+  height: 2px;
+  margin: 0 auto 42px;
+  background: linear-gradient(
+    to right,
+    transparent,
+    rgba(191, 228, 255, 0.75),
+    transparent
+  );
+}
+
+.subtitle {
+  font-size: clamp(52px, 6vw, 68px);
+  font-weight: 900;
+  color: #bfe4ff;
+}
+
+.closed-subtitle {
+  font-size: clamp(38px, 4.8vw, 54px);
+  font-weight: 700;
+  line-height: 1.35;
+  color: #ffffff;
+  padding: 0 90px;
+}
+
+.status {
+  position: absolute;
+  bottom: 24px;
+  left: 0;
+  width: 100%;
+  text-align: center;
+  font-size: 18px;
+  color: rgba(255,255,255,0.75);
+  z-index: 2;
+}
+</style>
+</head>
+
+<body>
+
+<div class="stage">
+
+  <img 
+    class="bg"
+    src="https://raw.githubusercontent.com/ijnconnect/todayoutpatient/main/background.png"
+    alt=""
+  >
+
+  <div class="content">
+    <div class="title">Today’s Outpatients</div>
+    <div class="date" id="date">Loading...</div>
+
+    <div id="mainDisplay">
+      <div class="number" id="count">--</div>
+      <div class="subtitle">Hearts Served Today</div>
+    </div>
+  </div>
+
+  <div class="status" id="status">Connecting to Google Sheet...</div>
+
+</div>
+
+<script>
+const SHEET_URL =
+"https://docs.google.com/spreadsheets/d/e/2PACX-1vRkSHuwMFhdfcEaQnjFi00S0GtQ5QioagbII8AYPtGbewBsOOm2BoHXNyw2E2fs2vk6dAJm12lvPxah/pub?output=csv";
+
+function clean(value) {
+  return value ? String(value).trim() : "";
+}
+
+function parseCSV(text) {
+  const rows = text.trim().split(/\r?\n/).map(parseCSVRow);
+  const headers = rows.shift().map(clean);
+
+  return rows.map(row => {
+    const obj = {};
+    headers.forEach((header, index) => {
+      obj[header] = clean(row[index]);
+    });
+    return obj;
+  });
+}
+
+function parseCSVRow(row) {
+  const result = [];
+  let current = "";
+  let insideQuotes = false;
+
+  for (let i = 0; i < row.length; i++) {
+    const char = row[i];
+
+    if (char === '"') {
+      insideQuotes = !insideQuotes;
+    } else if (char === "," && !insideQuotes) {
+      result.push(current);
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  result.push(current);
+  return result;
+}
+
+function getToday() {
+  return new Date().toLocaleDateString("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+function formatDate(dateString) {
+  const [day, month, year] = dateString.split("/");
+  const date = new Date(`${year}-${month}-${day}T00:00:00+08:00`);
+
+  return date.toLocaleDateString("en-GB", {
+    timeZone: "Asia/Kuala_Lumpur",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  });
+}
+
+function renderOpen(total) {
+  document.getElementById("mainDisplay").innerHTML = `
+    <div class="number">${total || "0"}</div>
+    <div class="divider"></div>
+    <div class="subtitle">Hearts Served Today</div>
+  `;
+}
+
+function renderClosed() {
+  document.getElementById("mainDisplay").innerHTML = `
+    <div class="closed-message">
+      OUTPATIENT<br>
+      CLINICS<br>
+      CLOSED
+    </div>
+    <div class="divider"></div>
+    <div class="closed-subtitle">
+      Outpatient services will resume on the next working day.<br>
+      Thank you.
+    </div>
+  `;
+}
+
+async function loadData() {
+  try {
+    const response = await fetch(SHEET_URL + "&cache=" + Date.now());
+    const csvText = await response.text();
+    const data = parseCSV(csvText);
+
+    const today = getToday();
+    const todayRow = data.find(row => clean(row["Date"]) === today);
+
+    document.getElementById("date").innerText = formatDate(today);
+
+    if (!todayRow) {
+      renderClosed();
+      document.getElementById("status").innerText =
+        "No data found for today (" + today + ")";
+      return;
+    }
+
+    const status = clean(todayRow["Status"]).toUpperCase();
+    const total = clean(todayRow["Total Outpatient"]);
+
+    if (status === "CLOSED") {
+      renderClosed();
+    } else {
+      renderOpen(total);
+    }
+
+    document.getElementById("status").innerText =
+      "Last updated: " +
+      new Date().toLocaleString("en-MY", {
+        timeZone: "Asia/Kuala_Lumpur"
+      });
+
+  } catch (error) {
+    renderClosed();
+    document.getElementById("status").innerText = "Error loading data";
+  }
+}
+
+loadData();
+setInterval(loadData, 300000);
+</script>
+
+</body>
+</html>
